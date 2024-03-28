@@ -50,6 +50,8 @@
 #include <pluginlib/class_loader.hpp>
 
 #include <rclcpp/rclcpp.hpp>
+#include <rcl/allocator.h>
+#include <rcl_yaml_param_parser/parser.h>
 
 #include "gz_ros2_control/gz_ros2_control_plugin.hpp"
 #include "gz_ros2_control/gz_system.hpp"
@@ -462,8 +464,37 @@ void GazeboSimROS2ControlPlugin::Configure(
 
   // Create the controller manager
   RCLCPP_INFO(this->dataPtr->node_->get_logger(), "Loading controller_manager");
+
+  auto allocator = rcl_get_default_allocator();
+  auto params = rcl_yaml_node_struct_init(allocator);
+  argument_sdf = sdfPtr->GetElement("parameters");
+  std::string yaml_path = argument_sdf->Get<std::string>();
+  if(rcl_parse_yaml_file(yaml_path.c_str(), params)){
+    std::cout << "Successfully loaded in robot controllers" << std::endl;
+    rcl_yaml_node_struct_print(params);
+  }else{
+    std::cout << "Could not load in robot controllers" << std::endl;
+  }
+
+  auto params_map = rclcpp::parameter_map_from(params);
+  std::vector<rclcpp::Parameter> params_vector;
+  std::string temp_name;
+  for(std::unordered_map<std::string,std::vector<rclcpp::Parameter>>::iterator it = params_map.begin(); it != params_map.end(); ++it) {;
+    std::cout << "Key: " << it->first << std::endl;
+    temp_name=it->first;
+    temp_name.erase(0,1);
+    temp_name.erase(0,temp_name.find('/')+1);
+    for(auto param : it->second){
+      temp_name = temp_name+"."+param.get_name();
+      RCLCPP_INFO(this->dataPtr->node_->get_logger(), temp_name.c_str());
+      params_vector.push_back(rclcpp::Parameter(temp_name, param.get_parameter_value()));
+    }
+  }
+
   rclcpp::NodeOptions cm_options = rclcpp::NodeOptions();
-  cm_options = cm_options.arguments(arguments);
+  // cm_options = cm_options.arguments(arguments);
+  cm_options.parameter_overrides(params_vector);
+  cm_options.automatically_declare_parameters_from_overrides(true);
   cm_options = cm_options.use_global_arguments(false);
   this->dataPtr->controller_manager_.reset(
     new controller_manager::ControllerManager(
