@@ -354,6 +354,7 @@ void GazeboSimROS2ControlPlugin::Configure(
   }
   rclcpp::NodeOptions node_options = rclcpp::NodeOptions();
   node_options = node_options.arguments(arguments);
+  node_options = node_options.use_global_arguments(false);
   this->dataPtr->node_ = rclcpp::Node::make_shared(node_name, ns, node_options);
   // this->dataPtr->node_ = rclcpp::Node::make_shared(node_name, ns);
   this->dataPtr->executor_ = std::make_shared<rclcpp::executors::MultiThreadedExecutor>();
@@ -463,6 +464,7 @@ void GazeboSimROS2ControlPlugin::Configure(
   RCLCPP_INFO(this->dataPtr->node_->get_logger(), "Loading controller_manager");
   rclcpp::NodeOptions cm_options = rclcpp::NodeOptions();
   cm_options = cm_options.arguments(arguments);
+  cm_options = cm_options.use_global_arguments(false);
   this->dataPtr->controller_manager_.reset(
     new controller_manager::ControllerManager(
       std::move(resource_manager_),
