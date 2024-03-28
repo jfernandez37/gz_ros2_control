@@ -342,14 +342,20 @@ void GazeboSimROS2ControlPlugin::Configure(
   }
   // Create a default context, if not already
   if (!rclcpp::ok()) {
-    rclcpp::init(
-      static_cast<int>(argv.size()), argv.data(), rclcpp::InitOptions(),
-      rclcpp::SignalHandlerOptions::None);
+    // rclcpp::init(
+    //   static_cast<int>(argv.size()), argv.data(), rclcpp::InitOptions(),
+    //   rclcpp::SignalHandlerOptions::None);
+    rclcpp::init(0, nullptr);
   }
 
   std::string node_name = "gz_ros_control";
-
-  this->dataPtr->node_ = rclcpp::Node::make_shared(node_name, ns);
+  for(int i = 0; i < arguments.size(); i++){
+    std::cout << arguments[i] << std::endl;
+  }
+  rclcpp::NodeOptions node_options = rclcpp::NodeOptions();
+  node_options = node_options.arguments(arguments);
+  this->dataPtr->node_ = rclcpp::Node::make_shared(node_name, ns, node_options);
+  // this->dataPtr->node_ = rclcpp::Node::make_shared(node_name, ns);
   this->dataPtr->executor_ = std::make_shared<rclcpp::executors::MultiThreadedExecutor>();
   this->dataPtr->executor_->add_node(this->dataPtr->node_);
   this->dataPtr->stop_ = false;
@@ -455,12 +461,15 @@ void GazeboSimROS2ControlPlugin::Configure(
 
   // Create the controller manager
   RCLCPP_INFO(this->dataPtr->node_->get_logger(), "Loading controller_manager");
+  rclcpp::NodeOptions cm_options = rclcpp::NodeOptions();
+  cm_options = cm_options.arguments(arguments);
   this->dataPtr->controller_manager_.reset(
     new controller_manager::ControllerManager(
       std::move(resource_manager_),
       this->dataPtr->executor_,
       controllerManagerNodeName,
-      this->dataPtr->node_->get_namespace()));
+      this->dataPtr->node_->get_namespace(),
+      cm_options));
   this->dataPtr->executor_->add_node(this->dataPtr->controller_manager_);
 
   if (!this->dataPtr->controller_manager_->has_parameter("update_rate")) {
@@ -476,7 +485,7 @@ void GazeboSimROS2ControlPlugin::Configure(
     std::chrono::duration_cast<std::chrono::nanoseconds>(
       std::chrono::duration<double>(1.0 / static_cast<double>(this->dataPtr->update_rate))));
 
-  // Force setting of use_sim_time parameter
+  // Force setting of use_sime_time parameter
   this->dataPtr->controller_manager_->set_parameter(
     rclcpp::Parameter("use_sim_time", rclcpp::ParameterValue(true)));
 
