@@ -481,11 +481,19 @@ void GazeboSimROS2ControlPlugin::Configure(
   std::string temp_name;
   for(std::unordered_map<std::string,std::vector<rclcpp::Parameter>>::iterator it = params_map.begin(); it != params_map.end(); ++it) {;
     std::cout << "Key: " << it->first << std::endl;
-    temp_name=it->first;
-    temp_name.erase(0,1);
-    temp_name.erase(0,temp_name.find('/')+1);
+    // temp_name=it->first;
+    // temp_name.erase(0,1);
+    // temp_name.erase(0,temp_name.find('/')+1);
     for(auto param : it->second){
+      temp_name=it->first;
+      temp_name.erase(0,1);
+      temp_name.erase(0,temp_name.find('/')+1);
+      // temp_name[temp_name.find('/')] = '.';
       temp_name = temp_name+"."+param.get_name();
+      // while(temp_name.find('.')!=std::string::npos){
+      //   temp_name[temp_name.find('.')] = '/';
+      // }
+      std::cout << temp_name << std::endl;
       RCLCPP_INFO(this->dataPtr->node_->get_logger(), temp_name.c_str());
       params_vector.push_back(rclcpp::Parameter(temp_name, param.get_parameter_value()));
     }
