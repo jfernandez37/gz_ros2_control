@@ -62,6 +62,9 @@ public:
 private:
   /// \brief Private data pointer.
   std::unique_ptr<GazeboSimROS2ControlPluginPrivate> dataPtr;
+  bool load_params_directly = false;
+  std::string controller_name = "";
+  std::string controller_params_path = "";
 };
 }  // namespace gz_ros2_control
 
