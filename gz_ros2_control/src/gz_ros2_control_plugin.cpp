@@ -302,13 +302,18 @@ void GazeboSimROS2ControlPlugin::Configure(
     load_params_directly_str = sdfPtr->GetElement("load_params_directly")->Get<std::string>();
     if (load_params_directly_str == "true"){
       load_params_directly = true;
-      sdf::ElementPtr sdfController = sdfPtr->GetElement("controller");
-      
-      sdf::ParamPtr controller_name_ptr = sdfController->GetAttribute("name");
-      controller_name = controller_name_ptr->GetAsString();
-      
-      sdf::ParamPtr controler_param_path_ptr = sdfController->GetAttribute("params_file");
-      controller_params_path = controler_param_path_ptr->GetAsString();
+
+      sdf::ElementPtr find_controllers_ptr = sdfPtr->GetFirstElement();
+      while(find_controllers_ptr!=nullptr){
+        if(find_controllers_ptr->GetName()=="controller"){
+          sdf::ParamPtr controller_name_ptr = find_controllers_ptr->GetAttribute("name");
+          controller_names.push_back(controller_name_ptr->GetAsString());
+          
+          sdf::ParamPtr controler_param_path_ptr = find_controllers_ptr->GetAttribute("params_file");
+          controller_params_paths.push_back(controler_param_path_ptr->GetAsString());
+        }
+        find_controllers_ptr = find_controllers_ptr->GetNextElement();
+      }
     }
   }
   
@@ -358,8 +363,10 @@ void GazeboSimROS2ControlPlugin::Configure(
   // Create a default context, if not already
   if (!rclcpp::ok()) {
     if (load_params_directly){
+      std::cout << "Loading parameters directly" << std::endl;
       rclcpp::init(0, nullptr);
     } else {
+      std::cout << "Not loading parameters directly" << std::endl;
       rclcpp::init(
         static_cast<int>(argv.size()), argv.data(), rclcpp::InitOptions(),
         rclcpp::SignalHandlerOptions::None);
@@ -479,9 +486,11 @@ void GazeboSimROS2ControlPlugin::Configure(
 
     std::vector<std::string> controller_manager_arguments = {"--ros-args"};
 
-    controller_manager_arguments.push_back(RCL_PARAM_FILE_FLAG);
+    for (auto controller_params_path : controller_params_paths){
+      controller_manager_arguments.push_back(RCL_PARAM_FILE_FLAG);
 
-    controller_manager_arguments.push_back(controller_params_path);
+      controller_manager_arguments.push_back(controller_params_path);
+    }
 
     controller_manager_node_options.arguments(controller_manager_arguments);
 
@@ -491,10 +500,14 @@ void GazeboSimROS2ControlPlugin::Configure(
       RCLCPP_INFO(this->dataPtr->node_->get_logger(), arg.c_str());
     }
 
-    std::vector<rclcpp::Parameter> overrides;
-    rclcpp::Parameter joint_trajectory_param = rclcpp::Parameter(controller_name+".params_file",rclcpp::ParameterValue(controller_params_path));
     
-    overrides.push_back(joint_trajectory_param);
+    std::vector<rclcpp::Parameter> overrides;
+    for (int i = 0; i < controller_names.size(); i++){
+      rclcpp::Parameter joint_trajectory_param = rclcpp::Parameter(controller_names[i]+".params_file",rclcpp::ParameterValue(controller_params_paths[i]));
+    
+      overrides.push_back(joint_trajectory_param);
+    }
+    
 
     controller_manager_node_options.parameter_overrides(overrides);
 
@@ -508,13 +521,13 @@ void GazeboSimROS2ControlPlugin::Configure(
         controller_manager_node_options
         ));
   } else{
-  this->dataPtr->controller_manager_.reset(
-    new controller_manager::ControllerManager(
-      std::move(resource_manager_),
-      this->dataPtr->executor_,
-      controllerManagerNodeName,
-      this->dataPtr->node_->get_namespace()
-      ));
+    this->dataPtr->controller_manager_.reset(
+      new controller_manager::ControllerManager(
+        std::move(resource_manager_),
+        this->dataPtr->executor_,
+        controllerManagerNodeName,
+        this->dataPtr->node_->get_namespace()
+        ));
   }
 
   this->dataPtr->executor_->add_node(this->dataPtr->controller_manager_);
@@ -564,7 +577,6 @@ void GazeboSimROS2ControlPlugin::PreUpdate(
     }
     warned = true;
   }
-
   rclcpp::Time sim_time_ros(std::chrono::duration_cast<std::chrono::nanoseconds>(
       _info.simTime).count(), RCL_ROS_TIME);
   rclcpp::Duration sim_period = sim_time_ros - this->dataPtr->last_update_sim_time_ros_;
