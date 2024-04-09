@@ -21,6 +21,7 @@
 #include <thread>
 #include <utility>
 #include <vector>
+#include <time.h>
 
 #ifdef GZ_HEADERS
 #include <gz/sim/components/Joint.hh>
@@ -137,6 +138,8 @@ GazeboSimROS2ControlPluginPrivate::GetEnabledJoints(
   for (const auto & jointEntity : jointEntities) {
     const auto jointName = _ecm.Component<sim::components::Name>(
       jointEntity)->Data();
+    
+    std::cout << jointName.c_str() << std::endl;
 
     // Make sure the joint type is supported, i.e. it has exactly one
     // actuated axis
@@ -305,7 +308,7 @@ void GazeboSimROS2ControlPlugin::Configure(
 
       sdf::ElementPtr find_controllers_ptr = sdfPtr->GetFirstElement();
       while(find_controllers_ptr!=nullptr){
-        if(find_controllers_ptr->GetName()=="controller"){
+        if(find_controllers_ptr->GetName()=="control"){
           sdf::ParamPtr controller_name_ptr = find_controllers_ptr->GetAttribute("name");
           controller_names.push_back(controller_name_ptr->GetAsString());
           
@@ -315,6 +318,9 @@ void GazeboSimROS2ControlPlugin::Configure(
         find_controllers_ptr = find_controllers_ptr->GetNextElement();
       }
     }
+  }
+  for(int i = 0; i<controller_names.size(); i++){
+    std::cout << "\n\n\n" << controller_names[i] << "\n\n\n" << std::endl;
   }
   
   // Get controller manager node name
@@ -363,10 +369,10 @@ void GazeboSimROS2ControlPlugin::Configure(
   // Create a default context, if not already
   if (!rclcpp::ok()) {
     if (load_params_directly){
-      std::cout << "Loading parameters directly" << std::endl;
+      std::cout << "\nLoading parameters directly\n" << std::endl;
       rclcpp::init(0, nullptr);
     } else {
-      std::cout << "Not loading parameters directly" << std::endl;
+      std::cout << "\nNot loading parameters directly\n" << std::endl;
       rclcpp::init(
         static_cast<int>(argv.size()), argv.data(), rclcpp::InitOptions(),
         rclcpp::SignalHandlerOptions::None);
@@ -386,11 +392,11 @@ void GazeboSimROS2ControlPlugin::Configure(
       }
     };
   this->dataPtr->thread_executor_spin_ = std::thread(spin);
-
+  
   RCLCPP_DEBUG_STREAM(
     this->dataPtr->node_->get_logger(), "[Gazebo Sim ROS 2 Control] Setting up controller for [" <<
       model.Name(_ecm) << "] (Entity=" << _entity << ")].");
-
+  
   // Get list of enabled joints
   auto enabledJoints = this->dataPtr->GetEnabledJoints(
     _entity,
@@ -439,6 +445,8 @@ void GazeboSimROS2ControlPlugin::Configure(
     return;
   }
 
+  std::cout << control_hardware_info.size() << "\n\n\n" << std::endl;
+
   for (unsigned int i = 0; i < control_hardware_info.size(); ++i) {
     std::string robot_hw_sim_type_str_ = control_hardware_info[i].hardware_plugin_name;
     RCLCPP_DEBUG(
@@ -446,6 +454,7 @@ void GazeboSimROS2ControlPlugin::Configure(
       robot_hw_sim_type_str_.c_str());
 
     std::unique_ptr<gz_ros2_control::GazeboSimSystemInterface> gzSimSystem;
+
     try {
       gzSimSystem = std::unique_ptr<gz_ros2_control::GazeboSimSystemInterface>(
         this->dataPtr->robot_hw_sim_loader_->createUnmanagedInstance(robot_hw_sim_type_str_));
@@ -456,6 +465,7 @@ void GazeboSimROS2ControlPlugin::Configure(
         ex.what());
       continue;
     }
+
     if (!gzSimSystem->initSim(
         this->dataPtr->node_,
         enabledJoints,
@@ -480,7 +490,7 @@ void GazeboSimROS2ControlPlugin::Configure(
   }
 
   // Create the controller manager
-  RCLCPP_INFO(this->dataPtr->node_->get_logger(), "Loading controller_manager");
+  // RCLCPP_INFO(this->dataPtr->node_->get_logger(), "Loading controller_manager");
   if (load_params_directly){
     rclcpp::NodeOptions controller_manager_node_options;
 
